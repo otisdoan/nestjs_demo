@@ -11,7 +11,6 @@ import { DatabaseService } from './database.service';
       load: [databaseConfig],
     }),
     MongooseModule.forRootAsync({
-      imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         uri: configService.get<string>('database.uri'),
