@@ -1,12 +1,24 @@
-import { Body, Controller, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { UserRegisterDto } from './dto/register.dto';
 import { UserLoginDto } from './dto/login.dto';
 import { HttpCode } from '@nestjs/common';
+import { errorResponse, successResponse } from 'src/common/utils/response';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  async getUserById(@Param('id') id: string) {
+    try {
+      const user = await this.authService.getUserById(id);
+      return successResponse('Get user successfully!', user);
+    } catch (error) {
+      return errorResponse(error);
+    }
+  }
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
