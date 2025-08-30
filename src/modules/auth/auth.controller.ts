@@ -5,7 +5,6 @@ import {
   HttpStatus,
   Param,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
@@ -15,16 +14,18 @@ import { HttpCode } from '@nestjs/common';
 import { errorResponse, successResponse } from 'src/common/utils/response';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RoleGuard } from 'src/common/guards/roles.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @UseGuards(AuthGuard('jwt-access'))
+  @UseGuards(AuthGuard('jwt-access'), RoleGuard)
+  @Roles('admin')
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  async getUserById(@Param('id') id: string, @Req() req: Request) {
-    console.log(req?.user);
+  async getUserById(@Param('id') id: string) {
     try {
       const user = await this.authService.getUserById(id);
       return successResponse('Get user successfully!', user);
