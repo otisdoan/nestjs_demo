@@ -1,58 +1,124 @@
 import {
-  Body,
   Controller,
-  Get,
-  HttpStatus,
-  Param,
   Post,
+  Body,
+  Res,
+  Req,
+  ValidationPipe,
   UseGuards,
 } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { UserRegisterDto } from './dto/register.dto';
-import { UserLoginDto } from './dto/login.dto';
-import { HttpCode } from '@nestjs/common';
-import { errorResponse, successResponse } from 'src/common/utils/response';
-import { AuthGuard } from '@nestjs/passport';
-
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { RoleGuard } from 'src/common/guards/roles.guard';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { GoogleLoginDto } from './dto/google-login.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @UseGuards(AuthGuard('jwt-access'), RoleGuard)
-  @Roles('admin')
-  @Get(':id')
-  @HttpCode(HttpStatus.OK)
-  async getUserById(@Param('id') id: string) {
+  @Post('register')
+  async register(
+    @Body(ValidationPipe) registerDto: RegisterDto,
+    @Res() res: Response,
+  ) {
     try {
-      const user = await this.authService.getUserById(id);
-      return successResponse('Get user successfully!', user);
+      const user = await this.authService.register(registerDto);
+      const { passwordHash, ...result } = user;
+
+      return res.status(201).json({
+        success: true,
+        message: 'Register successfully!',
+        data: result,
+      });
     } catch (error) {
-      return errorResponse(error);
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
   }
 
-  @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  async register(@Body() createUserDto: UserRegisterDto) {
-    const user = await this.authService.register(createUserDto);
-    return {
-      status: 'success',
-      message: 'Register successfully!',
-      data: user,
-    };
+  @Post('login')
+  async login(@Body(ValidationPipe) loginDto: LoginDto, @Res() res: Response) {
+    try {
+      const result = await this.authService.login(loginDto, res);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Login successfully!',
+        data: result,
+      });
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        message: error.message,
+      });
+    }
   }
 
-  @Post('login')
-  @HttpCode(HttpStatus.OK)
-  async login(@Body() loginUserDto: UserLoginDto) {
-    const user = await this.authService.login(loginUserDto);
-    return {
-      status: 'success',
-      message: 'Login successfully!',
-      data: user,
-    };
+  @Post('google')
+  async loginWithGoogle(
+    @Body(ValidationPipe) googleLoginDto: GoogleLoginDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.authService.loginWithGoogle(
+        googleLoginDto,
+        res,
+      );
+      const { passwordHash, ...userData } = result;
+
+      return res.status(200).json({
+        success: true,
+        message: 'Login successfully!',
+        data: userData,
+      });
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Post('refresh-token')
+  async refreshToken(@Req() req: Request, @Res() res: Response) {
+    try {
+      const refreshToken = req.cookies.refresh_token;
+
+      if (!refreshToken) {
+        return res.status(401).json({
+          success: false,
+          message: 'No refresh token provided',
+        });
+      }
+
+      const tokens = await this.authService.refreshToken(refreshToken, res);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Token refreshed successfully',
+        data: tokens,
+      });
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  async logout(@Res() res: Response) {
+    res.clearCookie('access_token');
+    res.clearCookie('refresh_token');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Logout successfully',
+    });
   }
 }
